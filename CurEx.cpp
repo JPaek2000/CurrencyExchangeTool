@@ -1,7 +1,7 @@
 /*Currency Exchange Tool using ExchangeRate-API by Jason Paek*/
 #include <iostream>
 #include <string>
-
+#include <curl/curl.h>
 // Callback function 
 
 // fetch exchange rate from API
