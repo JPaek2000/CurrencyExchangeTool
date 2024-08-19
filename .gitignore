@@ -1,2 +1,9 @@
+# api key
 api_key.txt
+# executable file
 CurrencyExchangeTool.exe
+
+# common build directories
+/build/
+/bin/
+/obj/
