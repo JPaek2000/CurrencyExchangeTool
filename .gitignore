@@ -1,7 +1,7 @@
 # api key
 api_key.txt
 # executable file
-C:\Users\adven\OneDrive\Documents\Github Projects\CurrencyExchangeTool\CurrencyExchangeTool.exe
+*.exe
 
 # common build directories
 /build/
