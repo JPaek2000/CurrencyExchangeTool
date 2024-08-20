@@ -2,8 +2,10 @@
 #include <fstream>
 #include <string>
 #include <curl/curl.h>
+#include <nlohmann/json.hpp> //for JSON parsing and serialization
 
 using namespace std; 
+using json = nlohmann::json;
 
 // Callback function handles HTTP request
 size_t WriteCallback(void* contents, size_t size, size_t nmemb, void* userp) {
@@ -24,39 +26,88 @@ string readApiKeyFromFile(const string& fileName) {
     return apiKey;
 }
 
-// Main function logic: api key, base currency, target currency, amount to convert. call function, retrieval, calculate, display, and handle errors
-int main() {
+// Function to fetch and parse exchange rates
+json fetchExchangeRates(const string& apiKey, const string& baseCurrency) {
     CURL* curl;
     CURLcode res;
     string readBuffer;
+    json exchangeRates;
 
-    // Read API key from api_key.txt
-    string apiKey = readApiKeyFromFile("api_key.txt");
-    if (apiKey.empty()) {
-        cerr << "API key status: Invalid" << endl;
-        return 1;
-    }
-
+    // Initialize curl sesh
     curl = curl_easy_init();
     if (curl) {
-        string baseCurrency = "USD";     // Base currency
-        string targetCurrency = "EUR";   // Target currency
-
+        // Construction of API request URL
         string url = "https://v6.exchangerate-api.com/v6/" + apiKey + "/latest/" + baseCurrency;
 
-        curl_easy_setopt(curl, CURLOPT_URL, url.c_str());
-        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback);
-        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer);
+        curl_easy_setopt(curl, CURLOPT_URL, url.c_str()); //url fetch
+        curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, WriteCallback); //writeback function called for data handling
+        curl_easy_setopt(curl, CURLOPT_WRITEDATA, &readBuffer); //readbuffer data destination
 
+        // HTTP request, error catch with Curle_Ok
         res = curl_easy_perform(curl);
         if (res != CURLE_OK) {
             cerr << "cURL error: " << curl_easy_strerror(res) << endl;
         }
 
+        //Clean the Sesh (release the resources from the curl handle)
         curl_easy_cleanup(curl);
 
-        cout << "Received data: " << readBuffer << endl;
+        // Parse JSON data
+        try {
+            exchangeRates = json::parse(readBuffer);
+        } catch (json::parse_error& e) {
+            cerr << "JSON parse error: " << e.what() << endl;
+        }
     }
+
+    return exchangeRates;
+}
+
+// Function to convert an amount using the exchange rate
+void convertCurrency(const string& baseCurrency, const string& targetCurrency, double amount) {
+    // Fetch exchange rates
+    string apiKey = readApiKeyFromFile("api_key.txt");
+    if (apiKey.empty()) {
+        cerr << "API key status: Invalid" << endl;
+        return;
+    }
+
+    auto data = fetchExchangeRates(apiKey, baseCurrency);
+    if (data.is_null() || !data.contains("conversion_rates")) {
+        cerr << "Failed to retrieve or parse exchange rates." << endl;
+        return;
+    }
+
+    auto rates = data["conversion_rates"];
+    if (rates.find(targetCurrency) == rates.end()) {
+        cerr << "Invalid target currency." << endl;
+        return;
+    }
+
+    double rate = rates[targetCurrency].get<double>();
+    double convertedAmount = rate * amount;
+
+    cout << amount << " " << baseCurrency << " is equal to " << convertedAmount << " " << targetCurrency << endl;
+}
+
+// Main function changed to incorporate simple user input (fixed doesnt just dump all exchange rates anymore)
+int main() {
+    string baseCurrency;
+    string targetCurrency;
+    double amount;
+
+    // User input for base currency, target currency, and amount
+    cout << "Enter the base currency (e.g., USD): ";
+    cin >> baseCurrency;
+
+    cout << "Enter the target currency (e.g., EUR): ";
+    cin >> targetCurrency;
+
+    cout << "Enter the amount to convert: ";
+    cin >> amount;
+
+    // Convert currency
+    convertCurrency(baseCurrency, targetCurrency, amount);
 
     return 0;
 }
